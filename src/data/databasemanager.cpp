@@ -4,6 +4,8 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
+#include <QDir>
+#include <QFileInfo>
 
 // ---------- singleton access ----------
 DatabaseManager& DatabaseManager::instance()
@@ -17,6 +19,15 @@ DatabaseManager& DatabaseManager::instance()
 // ---------- constructor / destructor ----------
 DatabaseManager::DatabaseManager(const QString& path)
 {
+    // Ensure directory for database file exists
+    QFileInfo dbInfo(path);
+    QDir dir = dbInfo.dir();
+    if (!dir.exists()) {
+        if (!dir.mkpath(".")) {
+            qWarning() << "Failed to create directory for DB:" << dir.absolutePath();
+        }
+    }
+
     m_database = QSqlDatabase::addDatabase(\"QSQLITE\");
     m_database.setDatabaseName(path);
 
@@ -29,8 +40,12 @@ DatabaseManager::DatabaseManager(const QString& path)
 
 DatabaseManager::~DatabaseManager()
 {
-    if (m_database.isOpen())
+    if (m_database.isOpen()) {
+        const QString connectionName = m_database.connectionName();
         m_database.close();
+        m_database = QSqlDatabase(); // release reference before removal
+        QSqlDatabase::removeDatabase(connectionName);
+    }
 }
 
 // ---------- public helpers ----------
